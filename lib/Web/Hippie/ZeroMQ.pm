@@ -23,6 +23,9 @@ use Plack::Util::Accessor qw/
 sub prepare_app {
     my ($self) = @_;
 
+    die "bus is a required builder argument for Web::Hippie::ZeroMQ"
+        unless $self->bus;
+
     # our handlers for hippie actions
     mount '/_hippie' => builder {        
         # websocket/mxhr/poll handlers
