@@ -63,7 +63,20 @@ builder {
             my ($env) = @_;
 
             my $req = Plack::Request->new($env);
-            warn "path: " . $req->path;
+            my $path = $req->path;
+            my $channel = $env->{'hippie.args'};
+
+            if ($path eq '/new_listener') {
+                warn "Got new listener on channel $channel\n";
+            } elsif ($path eq '/message') {
+                warn "Posting message to channel $channel\n";
+            } elsif ($path eq '/error') {
+                warn "Got hippie error\n";
+            } else {
+                warn "Unknown hippie event: $path\n";
+            }
+
+            return;
         };
     };
 

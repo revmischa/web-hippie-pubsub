@@ -33,13 +33,13 @@ sub prepare_app {
         unless $self->bus;
 
     my $builder = Plack::Builder->new;
-    
+
     # websocket/mxhr/poll handlers
     $builder->add_middleware('+Web::Hippie');
     
-    # AnyMQ
+    # AnyMQ stuff for Web::Hippie
     $builder->add_middleware('+Web::Hippie::Pipe', bus => $self->bus);
-
+    
     # our simple publish/subscribe event code
     $builder->add_middleware(sub {
         my $app = shift;
@@ -54,7 +54,7 @@ sub prepare_app {
             if ($req->path eq '/new_listener') {
                 # called when we get a new topic subscription
 
-                die "Channel is required for new_listener" unless $channel;
+                return [ 400, [], [ "Channel is required for new_listener" ] ] unless $channel;
                 my $topic = eval { $env->{'hippie.bus'}->topic($channel) };
                 unless ($topic) {
                     warn "Could not get topic for channel $channel: $@";
@@ -62,8 +62,9 @@ sub prepare_app {
                 }
 
                 # subscribe client to events on $channel
-                $env->{'hippie.listener'}->subscribe( $topic );
-                return [ '200', [ 'Content-Type' => 'text/plain' ], [ "Now listening on $channel" ] ];
+                $env->{'hippie.listener'}->subscribe($topic);
+                my $res = $app->($env);
+                return $res || [ '200', [ 'Content-Type' => 'text/plain' ], [ "Now listening on $channel" ] ];
 
             } elsif ($req->path eq '/message') {
                 # called when we are publishing a message
@@ -101,7 +102,7 @@ sub prepare_app {
             return [ '404', [ 'Content-Type' => 'text/plain' ], [ "unknown event server path " . $req->path ] ];
         }
     });
-    
+
     $self->app( $builder->to_app($self->app) );
 }
 
