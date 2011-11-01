@@ -151,6 +151,8 @@ Web::Hippie::PubSub - Comet/Long-poll event server using AnyMQ
 This module adds publish/subscribe capabilities to L<Web::Hippie> using
 AnyMQ.
 
+See eg/event_server.psgi for example usage.
+
 =head1 SEE ALSO
 
 L<Web::Hippie::Pipe>, L<Web::Hippie::Pipe>, L<AnyMQ>,
