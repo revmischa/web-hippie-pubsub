@@ -1,0 +1,153 @@
+11:57 <      t0m> revmischa: why are you not just subclassing web::hippie?
+11:57 <      t0m> that is quite possibly a stupid question, I haven't read it yet :)
+11:57 <revmischa> t0m: cuz i don't really know what i'm doing?
+11:58 <revmischa> im not really how to compose middlewares into a new middleware
+11:58 <      t0m> erm, ok... lets step back :)
+11:58 <revmischa> there's web::hippie and web::hippie::pipe
+11:58 <revmischa> and i want both of them
+11:58 <revmischa> subclassing both sounds like a poor idea
+11:58 <      t0m> why are you making a zmq specific middleware at all?
+11:58 <      t0m> as the point is rather that you abstract the mq behind anymq
+11:59 <revmischa> yeah, but the AnyMQ interface has some issues, or i had some issues implementing it at least with AnyMQ::ZeroMQ
+11:59              >>> zby_home!~quassel@nat-tor2-95.aster.pl
+11:59 <revmischa> which i would also really like someone who knows what they're doing to look at
+11:59 <      t0m> ..like..
+11:59 <      t0m> Ok :)
+11:59 <      t0m> So your failing tests, or nopaste for that is?
+11:59 <revmischa> like publish, which both notifies listeners of an event and sends an event to the server, so if you have a listener subscribed to it it gets two notifications
+12:00 <revmischa> t0m: https://github.com/revmischa/anymq-zeromq
+12:01 <revmischa> i think the issue was Web::Hippie was not distinguishing between a subscription bus and a publishing bus, which you need to do in zeromq
+12:01              <   zby_home_!~quassel@nat-tor2-95.aster.pl [Ping timeout: 360 seconds]
+12:01 <revmischa> it was combining them into one bus, which shared topics, which is an issue
+12:01 <      t0m> erm, right, so why not just not call AnyMQ::Topic::publish?
+12:02 <      t0m> then you send the message to zmq, and your consumers on the same topic will consume it, but not get the 'internal' version
+12:02 <revmischa> because if you are listening for that topic on the same bus, then you get notified when you call publish, and then you get the event again for the subscription
+12:02 <revmischa> the problem is your bus can be both a publisher and a consumer on the same topic
+12:02 <revmischa> and i wasn't sure how to work around it
+12:03 <revmischa> other than not modifying publish()
+12:03 <      t0m> well, you can do this also with amqp
+12:03              t0m goes to look what that does
+12:03 <revmischa> amqp is unreadable, to me anyway
+12:04 <revmischa> and it probably doesn't have separate channels for publish and subscribe like zmq does
+12:04 <      t0m> yes, it does
+12:04 <      t0m> https://github.com/clkao/AnyMQ-AMQP/blob/master/lib/AnyMQ/Topic/Trait/AMQP.pm#L4
+12:04 <      t0m> https://github.com/clkao/AnyMQ-AMQP/blob/master/lib/AnyMQ/Topic/Trait/AMQP.pm#L8
+12:04 <      t0m> so that avoids becoming a subscriber if you have the publish_only flag set
+12:05 <      t0m> can you not do something similar with your topic trait to let the user configure this?
+12:05 <      t0m> Sometimes you _WANT_ to see messages you publish!
+12:05 <revmischa> i did add the publish only flag
+12:05 <revmischa> but that attribute is kinda specific, isn't it? the point is web::hippie doesn't do this stuff on its own
+12:06 <      t0m> erm, so?
+12:06 <revmischa> so i need to modify it
+12:06 <      t0m> and that's what your trait does?
+12:06 <revmischa> no that's what the middleware does
+12:06 <      t0m> erm, no.
+12:06 <revmischa> that is where i would set publish_only
+12:06 <      t0m> level fail
+12:06 <      t0m> no
+12:06 <revmischa> then where?
+12:07 <      t0m> you should set publish_only from whatever sets up the middleware... As the user configures the _general_ web::hippie middleware...
+12:07 <revmischa> i have tried to divine how this is supposed to be structured, since there's no docs or comments anywhere
+12:07 <      t0m> And that passes all the correct configuration to AnyMQ
+12:07 <      t0m> which loads your traits
+12:07 <      t0m> and those traits can happily consume extra config, that isn't a 'standard' part of the AnyMQ config
+12:07 <revmischa> amqp has only one bus, i'm pretty sure
+12:07 <      t0m> or you can setup AnyMQ yourself manually
+12:07 <      t0m> and pass it into Web::Hippie
+12:07 <      t0m> revmischa: you're pretty wrong
+12:08 <revmischa> $self->bus
+12:08 <      t0m> yes, that's for one instance of the middleware? So?
+12:09 <revmischa> in zeromq, a bus can publish or it can subscribe
+12:09 <revmischa> https://github.com/revmischa/anymq-zeromq/blob/master/t/10-pubsub.t
+12:11 <      t0m> uh-huh? So what you're saying, basically, is that web::hippie (or your use of it, with zmq) needs to be able to have the ability to publish to a different anymq topic than the topic to which subscribers are subscribed to?
+12:11 <revmischa> i believe so...
+12:11 <      t0m> Right :)
+12:11 <      t0m> So fix Web::Hippie
+12:12 <      t0m> that change can't be rocket surgery :)
+12:12 <      t0m> it's probably a 4 line patch, not including tests... right?
+12:12              revmischa waves hands
+12:12 <      t0m> ?
+12:13 <revmischa> nevermind
+12:14 <      t0m> it can't be harder than what you're trying to do with having your own version, right?
+12:16 <revmischa> well sorta, i have my own version actually working
+12:18 <revmischa> my tests for the raw interface to AnyMQ::ZeroMQ work as they should
+12:18              >>> sugar!~sugar@93-81-207-21.broadband.corbina.ru
+12:21 <      t0m> :)
+12:22 <revmischa> okay, anyway, forgetting all of that for now
+12:22 <revmischa> there is some basic boilerplate code for making a pubsub server
+12:22 <      t0m> I still don't see why you need all the code however..
+12:22 <      t0m> https://github.com/revmischa/web-hippie-zeromq/blob/master/lib/Web/Hippie/ZeroMQ.pm#L38
+12:22 <      t0m> I mean, this stuff _should_ be in the anymq layer, right?
+12:22 <revmischa> yeah basically that stuff
+12:22 <revmischa> well
+12:23 <revmischa> that is basically using the interface Web::Hippie exposes
+12:23 <revmischa> i just got it from https://metacpan.org/source/CLKAO/Web-Hippie-0.39/eg/chat/chat.psgi
+12:23 <revmischa> more or less the same thing
+12:23 <      t0m> sure :) But that's meant to be the app interface
+12:23 <revmischa> i just wanted to make that basic pub/sub stuff reusable
+12:23 <revmischa> that's all
+12:23 <      t0m> you just stole all the callbacks the app gets
+12:23 <      t0m> when you come to write your app, you don't get those callbacks any more.
+12:23 <revmischa> because i have multiple projects that i want a publish/subscribe event server, and i'm sure other people do too
+12:23 <      t0m> so you're kinda stuffed :)
+12:24 <revmischa> ah
+12:24 <revmischa> i was wondering about that
+12:24 <revmischa> but that's okay too
+12:24 <      t0m> it's entirely possible to re-dispatch into the app and get those callbacks to work again fairly easily
+12:25 <      t0m> it's just that it feels like the wrong place for that logic to be..
+12:25 <      t0m> Sorry to be vague, but you see what I mean? :)
+12:25 <revmischa> i totally see what you mean, but i'm okay with it being a dinky little mostly self-contained pubsub event server
+12:25 <revmischa> if you could show me how to re-dispatch the events that'd be cool
+12:26 <revmischa> but when i run that as a psgi script, it works, when i run it as middleware the hippie stuff doesn't seem to be getting called, and feersum dies
+12:26 <      t0m> I'd really like to be able to reuse it. But then I guess I should get off my ass and get the amqp trait to a state I can use that in too. :-P
+12:26 <revmischa> i'm actually trying to build some important production code on this, i hope that's not a terrible idea
+12:29 <      t0m> I think that you'll hate yourself unless you get the bits in the right place.. As at some point you'll want _another_ service that talks on this bus, and is an irc bot or long running process or whatever, and having to re-write half of the abstraction sucks.
+12:29 <revmischa> okay
+12:30 <      t0m> This is what I've done with AMQP stuff at work. I really wish I'd worked on AnyMQ/Hippie stuff more to start with, as I've ended up having 9 copies of the same code various places, none of which are the AMQP trait clkao mostly wrote being on cpan
+12:30 <      t0m> sad panda
+12:30 <      t0m> but I'm obviously biased here :-D
+12:31 <      t0m> I've ended up doing _a lot_ of different stuff with amqp, so it's been really annoying when I stopped and thought abou tit
+12:31 < miyagawa> overCPANization sucks :)
+12:32              <   alnewkirk!~alnewkirk@pool-71-185-25-83.phlapa.fios.verizon.net [Ping timeout: 360 seconds]
+12:33 <      t0m> sure, I'm not trying to say _everything_ should be on cpan, I mean if this works for you, that's awesome, but I think given you're already writing 2 of the three pieces, you can make it nicer by moving code from #3 => #1 :)
+12:33 <revmischa> yeah lemme see where i'm at
+12:34 <revmischa> #3 is totally reusable though, that's the thing!
+12:34 <revmischa> if it can redispatch the events
+12:34 <revmischa> its really basic stuff, like when the client sends an event, publish it
+12:35 <      t0m> heh, well, anyway, that's just $self->app->($env)
+12:36 <revmischa> ok
+12:36 <revmischa> i think my problem is here: https://metacpan.org/source/CLKAO/AnyMQ-0.33/lib/AnyMQ.pm
+12:36 <revmischa> in sub topic
+12:36 <revmischa> there's no way to make a topic publisher only, because it's saved by name
+12:36 <revmischa> so if i subscribe to topic foo, and try to publish to topic foo, it'll be referencing the same topic
+12:37 <revmischa> if i say publisher_only, then both publish and subscribe will use the same publisher_only topic
+12:37 <revmischa> yes?
+12:37 <revmischa> so i can work around it in my app code, but it seems like there's too much ambiguity in the AnyMQ interface to put that logic in AnyMQ::ZeroMQ
+12:37 <revmischa> does that make sense? am i being a dummy?
+12:38 <revmischa> the other option would be to have AnyMQ::Trait::Topic::ZeroMQ keep track of which messages it's published and not call local subscribers for them, but that seems ugliest
+12:39              >>> alnewkirk!~alnewkirk@pool-71-185-25-83.phlapa.fios.verizon.net
+12:39 <      t0m> no, that does make sense :)
+12:40 <revmischa> so i'm not sure how to handle this without either having anymq::zeromq-specific code in my app, or changing the entire interface to AnyMQ
+12:40              <   theory!~Theory@dv-fw-a-nat.iovation.com [Quit: theory]
+12:41 <revmischa> unless there's something i'm not getting?
+12:41 <      t0m> revmischa: ok, so, how about you have one anymq instance for publishing, and one for subscribing?
+12:41 <revmischa> i can't "just pass in options", because it has a singleton for each topic name
+12:41 <revmischa> t0m: wouldn't i be rewriting web::hippie then?
+12:42 <      t0m> you just teach web::hippie that it can have a bus (recieve) or publish_bus (send)
+12:42 <      t0m> and if publish_bus is defined, it uses that
+12:42 <      t0m> otherwise it just publishes to 'bus'
+12:43 <revmischa> i am trying to think of how to work that into Web::Hippie
+12:43 <revmischa> it's making my brain hurt
+12:45              >>> theory!~Theory@dv-fw-a-nat.iovation.com
+12:46 <revmischa> yeah, i have no idea how to do that t0m
+12:49 <revmischa> like if i could just add in an option in AnyMQ::Topic::publish that would be awesome, to say publish and don't notify listeners
+12:50 <revmischa> but its signature is my ($self, @messages) = @_;
+12:50 <revmischa> so i made a new method that does that, but that's specific to AnyMQ::ZeroMQ
+12:50 <revmischa> so that, in a rather long-winded answer, is why this is zeromq-specific
+12:50 <revmischa> i'd love it to not be, but maybe i need to change anymq's interface?
+12:52 < miyagawa> at this point I don't understand why you just avoid hippie and AnyMQ and roll your own with zeromq
+12:52 < miyagawa> why you just *don't*, i mean
+12:56 <      t0m> revmischa: yeah, actually, fair enough.. Having brained through it, I think what you're doing is perfectly fine..
+12:57 <      t0m> I'd be tempted to add an attribute to AnyMQ::Topic to do that, and a way of getting that set as a topic is created..
+12:58 <      t0m> but other than that I'll just shut up. Other than to say you need to add $self->app->($env) when you want to re-dispatch into the app your middleware wraps, but in your case, it's gonna be a pretty small app :)
+12:59 <      t0m> I may see if I can make your thing more generic, _if_ I ever get off my arse and make anymq's amqp stuff work for me

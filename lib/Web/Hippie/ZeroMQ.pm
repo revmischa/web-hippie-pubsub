@@ -27,7 +27,7 @@ sub prepare_app {
         unless $self->bus;
 
     # our handlers for hippie actions
-    mount '/_hippie' => builder {        
+    mount '/_hippie' => builder {
         # websocket/mxhr/poll handlers
         enable "+Web::Hippie";
 
@@ -48,8 +48,6 @@ sub prepare_app {
                 die "Channel not found on new_listener" unless $channel;
                 my $topic = $env->{'hippie.bus'}->topic($channel);
 
-                warn "listener added";
-                
                 # subscribe client to events on $channel
                 $env->{'hippie.listener'}->subscribe( $topic );
                 return [ '200', [ 'Content-Type' => 'text/plain' ], [ "Now listening on $channel" ] ];
@@ -63,6 +61,10 @@ sub prepare_app {
                 my $msg = $env->{'hippie.message'};
                 $msg->{time} = time;
                 $msg->{address} = $env->{REMOTE_ADDR};
+
+                # publish event, but don't notify local listeners (or
+                # they will receive a duplicate event)
+                $topic->send_events($msg);
 
                 return [ '200', [ 'Content-Type' => 'text/plain' ], [ "Event published on $channel" ] ];
             } else {
