@@ -34,17 +34,19 @@ sub prepare_app {
 
     my $builder = Plack::Builder->new;
     
-    # our handlers for hippie actions
     # websocket/mxhr/poll handlers
     $builder->add_middleware('+Web::Hippie');
+    
     # AnyMQ
     $builder->add_middleware('+Web::Hippie::Pipe', bus => $self->bus);
+
+    # our simple publish/subscribe event code
     $builder->add_middleware(sub {
         my $app = shift;
         return sub {
-        # these are handlers for internal hippie events, NOT actual
-        # URLs visited by the client
-        # (/new_listener, /message, /error)
+            # these are handlers for internal hippie events, NOT actual
+            # URLs visited by the client
+            # (/new_listener, /message, /error)
             my $env = shift;
             my $channel = $env->{'hippie.args'};
             my $req = Plack::Request->new($env);
@@ -52,8 +54,12 @@ sub prepare_app {
             if ($req->path eq '/new_listener') {
                 # called when we get a new topic subscription
 
-                die "Channel not found on new_listener" unless $channel;
-                my $topic = $env->{'hippie.bus'}->topic($channel);
+                die "Channel is required for new_listener" unless $channel;
+                my $topic = eval { $env->{'hippie.bus'}->topic($channel) };
+                unless ($topic) {
+                    warn "Could not get topic for channel $channel: $@";
+                    return [ 500, [ 'Content-Type' => 'text/plain' ], [ "Unable to create listener for channel $channel" ] ];
+                }
 
                 # subscribe client to events on $channel
                 $env->{'hippie.listener'}->subscribe( $topic );
@@ -62,16 +68,18 @@ sub prepare_app {
             } elsif ($req->path eq '/message') {
                 # called when we are publishing a message
 
-                die "Channel not found on message" unless $channel;
+                # get message channel
+                return [ '400', [ 'Content-Type' => 'text/plain' ], [ "Channel is required" ] ] unless $channel;
                 my $topic = $env->{'hippie.bus'}->topic($channel);
-                            
+
+                # get message, tack on sent time and from addr
                 my $msg = $env->{'hippie.message'};
                 $msg->{time} = time;
                 $msg->{address} = $env->{REMOTE_ADDR};
 
                 # publish event, but don't notify local listeners (or
                 # they will receive a duplicate event)
-                $topic->send_events($msg);
+                $topic->publish($msg);
 
                 return [ '200', [ 'Content-Type' => 'text/plain' ], [ "Event published on $channel" ] ];
             } else {
@@ -84,7 +92,8 @@ sub prepare_app {
                 if ($req->path eq '/error') {
                     warn "==> disconnecting $h (error or timeout)\n";
                 } else {
-                    die "unknown hippie message";
+                    warn "unknown hippie message: " . $req->path;
+                    return [ '500', [ 'Content-Type' => 'text/plain' ], [ 'Unknown error' ] ];
                 }
             }
 
