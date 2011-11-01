@@ -1,4 +1,4 @@
-package Web::Hippie::ZeroMQ;
+package Web::Hippie::PubSub;
 
 use strict;
 use warnings;
@@ -15,7 +15,7 @@ use Web::Hippie::Pipe;
 use JSON;
 use Carp qw/croak cluck/;
 
-# required args for constructing ZeroMQ client
+# required args for constructing PubSub client
 use Plack::Util::Accessor qw/
     bus
 /;
@@ -29,7 +29,7 @@ sub call {
 sub prepare_app {
     my ($self) = @_;
 
-    die "bus is a required builder argument for Web::Hippie::ZeroMQ"
+    die "bus is a required builder argument for Web::Hippie::PubSub"
         unless $self->bus;
 
     my $builder = Plack::Builder->new;
@@ -114,8 +114,8 @@ __END__
 
 =head1 NAME
 
-Web::Hippie::ZeroMQ - Comet/Long-poll event server that can talk to a
-ZeroMQ server
+Web::Hippie::PubSub - Comet/Long-poll event server that can talk to a
+PubSub server
 
 =head1 SYNOPSIS
 
@@ -135,7 +135,7 @@ ZeroMQ server
   builder {
     # mount hippie server
     mount '/_hippie' => builder {
-      enable "+Web::Hippie::ZeroMQ", bus => $bus;
+      enable "+Web::Hippie::PubSub", bus => $bus;
       sub {
         my $env = shift;
         my $args = $env->{'hippie.args'};
@@ -149,11 +149,11 @@ ZeroMQ server
 =head1 DESCRIPTION
 
 This module adds publish/subscribe capabilities to L<Web::Hippie> using
-AnyMQ::ZeroMQ.
+AnyMQ.
 
 =head1 SEE ALSO
 
-L<Web::Hippie::Pipe>, L<Web::Hippie::Pipe>, L<AnyMQ::ZeroMQ>,
+L<Web::Hippie::Pipe>, L<Web::Hippie::Pipe>, L<AnyMQ>,
 L<ZeroMQ::PubSub>
 
 =head1 AUTHOR

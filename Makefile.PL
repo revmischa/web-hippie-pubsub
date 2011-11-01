@@ -4,13 +4,13 @@ sub auto_set_repository { }
 
 use inc::Module::Install;
 perl_version('5.008');
-name 'Web-Hippie-ZeroMQ';
-all_from 'lib/Web/Hippie/ZeroMQ.pm';
-readme_from 'lib/Web/Hippie/ZeroMQ.pm';
+name 'Web-Hippie-PubSub';
+all_from 'lib/Web/Hippie/PubSub.pm';
+readme_from 'lib/Web/Hippie/PubSub.pm';
 build_requires 'Test::More';
 test_requires 'Test::Requires';
 requires 'Plack';
-requires 'AnyMQ::ZeroMQ' => '0.03';
+requires 'AnyMQ' => '0.34';
 requires 'JSON';
 requires 'Web::Hippie';
 

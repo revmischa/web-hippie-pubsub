@@ -1,6 +1,6 @@
 NAME
-    Web::Hippie::ZeroMQ - Comet/Long-poll event server that can talk to a
-    ZeroMQ server
+    Web::Hippie::PubSub - Comet/Long-poll event server that can talk to a
+    PubSub server
 
 SYNOPSIS
       use Plack::Builder;
@@ -19,7 +19,7 @@ SYNOPSIS
       builder {
         # mount hippie server
         mount '/_hippie' => builder {
-          enable "+Web::Hippie::ZeroMQ", bus => $bus;
+          enable "+Web::Hippie::PubSub", bus => $bus;
           sub {
             my $env = shift;
             my $args = $env->{'hippie.args'};
@@ -32,10 +32,10 @@ SYNOPSIS
 
 DESCRIPTION
     This module adds publish/subscribe capabilities to Web::Hippie using
-    AnyMQ::ZeroMQ.
+    AnyMQ.
 
 SEE ALSO
-    Web::Hippie::Pipe, Web::Hippie::Pipe, AnyMQ::ZeroMQ, ZeroMQ::PubSub
+    Web::Hippie::Pipe, Web::Hippie::Pipe, AnyMQ, ZeroMQ::PubSub
 
 AUTHOR
     Mischa Spiegelmock <revmischa@cpan.org>
@@ -50,4 +50,3 @@ LICENSE
     This library is free software; you can redistribute it and/or modify it
     under the same terms as Perl itself.
 
-SEE ALSO

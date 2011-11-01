@@ -6,14 +6,14 @@ use warnings;
 use AnyMQ;
 use AnyMQ::ZeroMQ;
 use Web::Hippie::App::JSFiles;
-use Web::Hippie::ZeroMQ;
+use Web::Hippie::PubSub;
 use Plack::Builder;
 use Plack::Request;
 use Carp qw/croak cluck/;
 
 # run using Feersum::Runner or Plack::Handler::Feersum
-# deployment:  plackup -s Feersum --port 4000 -Ilib -E deployment event_server.psgi
 # development: plackup -s Feersum --port 4000 -Ilib -E development -r event_server.psgi
+# deployment:  plackup -s Feersum --port 4000 -Ilib -E deployment event_server.psgi
 
 my $mq_bus = AnyMQ->new_with_traits(
     traits            => [ 'ZeroMQ' ],
@@ -56,9 +56,9 @@ builder {
             ],
         );
 
-    # zeromq hippie server
+    # anymq hippie server
     mount '/_hippie' => builder {
-        enable "+Web::Hippie::ZeroMQ", bus => $mq_bus;
+        enable "+Web::Hippie::PubSub", bus => $mq_bus;
         sub {
             my ($env) = @_;
 
