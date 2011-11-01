@@ -114,8 +114,7 @@ __END__
 
 =head1 NAME
 
-Web::Hippie::PubSub - Comet/Long-poll event server that can talk to a
-PubSub server
+Web::Hippie::PubSub - Comet/Long-poll event server using AnyMQ
 
 =head1 SYNOPSIS
 
