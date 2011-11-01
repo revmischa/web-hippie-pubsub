@@ -20,24 +20,31 @@ use Plack::Util::Accessor qw/
     bus
 /;
 
+sub call {
+    my ($self, $env) = @_;
+    my $res = $self->app->($env);
+    return $res;
+}
+
 sub prepare_app {
     my ($self) = @_;
 
     die "bus is a required builder argument for Web::Hippie::ZeroMQ"
         unless $self->bus;
 
+    my $builder = Plack::Builder->new;
+    
     # our handlers for hippie actions
-    mount '/_hippie' => builder {
-        # websocket/mxhr/poll handlers
-        enable "+Web::Hippie";
-
-        # AnyMQ
-        enable "+Web::Hippie::Pipe", bus => $self->bus;
-
+    # websocket/mxhr/poll handlers
+    $builder->add_middleware('+Web::Hippie');
+    # AnyMQ
+    $builder->add_middleware('+Web::Hippie::Pipe', bus => $self->bus);
+    $builder->add_middleware(sub {
+        my $app = shift;
+        return sub {
         # these are handlers for internal hippie events, NOT actual
         # URLs visited by the client
         # (/new_listener, /message, /error)
-        sub {
             my $env = shift;
             my $channel = $env->{'hippie.args'};
             my $req = Plack::Request->new($env);
@@ -83,8 +90,10 @@ sub prepare_app {
 
             # we didn't handle anything
             return [ '404', [ 'Content-Type' => 'text/plain' ], [ "unknown event server path " . $req->path ] ];
-        };
-    };
+        }
+    });
+    
+    $self->app( $builder->to_app($self->app) );
 }
 
 1;
