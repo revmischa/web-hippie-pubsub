@@ -1,6 +1,5 @@
 NAME
-    Web::Hippie::PubSub - Comet/Long-poll event server that can talk to a
-    PubSub server
+    Web::Hippie::PubSub - Comet/Long-poll event server using AnyMQ
 
 SYNOPSIS
       use Plack::Builder;
@@ -33,6 +32,8 @@ SYNOPSIS
 DESCRIPTION
     This module adds publish/subscribe capabilities to Web::Hippie using
     AnyMQ.
+
+    See eg/event_server.psgi for example usage.
 
 SEE ALSO
     Web::Hippie::Pipe, Web::Hippie::Pipe, AnyMQ, ZeroMQ::PubSub

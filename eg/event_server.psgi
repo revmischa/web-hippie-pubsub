@@ -12,8 +12,8 @@ use Plack::Request;
 use Carp qw/croak cluck/;
 
 # run using Feersum::Runner or Plack::Handler::Feersum
-# development: plackup -s Feersum --port 4000 -Ilib -E development -r event_server.psgi
-# deployment:  plackup -s Feersum --port 4000 -Ilib -E deployment event_server.psgi
+# development: plackup -s Feersum --port 4002 -I../lib -E development -r event_server.psgi
+# deployment:  plackup -s Feersum --port 4002 -I../lib -E deployment event_server.psgi
 
 my $mq_bus = AnyMQ->new_with_traits(
     traits            => [ 'ZeroMQ' ],
