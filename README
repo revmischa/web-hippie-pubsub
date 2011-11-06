@@ -36,7 +36,7 @@ DESCRIPTION
     See eg/event_server.psgi for example usage.
 
 SEE ALSO
-    Web::Hippie::Pipe, Web::Hippie::Pipe, AnyMQ, ZeroMQ::PubSub
+    Web::Hippie, Web::Hippie::Pipe, AnyMQ, ZeroMQ::PubSub
 
 AUTHOR
     Mischa Spiegelmock <revmischa@cpan.org>
