@@ -82,24 +82,29 @@ sub prepare_app {
                 # they will receive a duplicate event)
                 $topic->publish($msg);
 
-                return [ '200', [ 'Content-Type' => 'text/plain' ], [ "Event published on $channel" ] ];
+                my $res = $app->($env);
+                return $res || [ '200', [ 'Content-Type' => 'text/plain' ], [ "Event published on $channel" ] ];
             } else {
                 # other message (should only be error)
                 # make sure stuff is kosher
+
+                my $res = $app->($env);
                 
                 my $h = $env->{'hippie.handle'}
-                    or return [ '400', [ 'Content-Type' => 'text/plain' ], [ "missing handle" ] ];
+                    or return $res || [ '400', [ 'Content-Type' => 'text/plain' ], [ "missing handle" ] ];
 
                 if ($req->path eq '/error') {
                     warn "==> disconnecting $h (error or timeout)\n";
                 } else {
                     warn "unknown hippie message: " . $req->path;
-                    return [ '500', [ 'Content-Type' => 'text/plain' ], [ 'Unknown error' ] ];
+                    return $res || [ '500', [ 'Content-Type' => 'text/plain' ], [ 'Unknown error' ] ];
                 }
             }
 
+            my $res = $app->($env);
+            
             # we didn't handle anything
-            return [ '404', [ 'Content-Type' => 'text/plain' ], [ "unknown event server path " . $req->path ] ];
+            return $res || [ '404', [ 'Content-Type' => 'text/plain' ], [ "unknown event server path " . $req->path ] ];
         }
     });
 
@@ -155,7 +160,7 @@ See eg/event_server.psgi for example usage.
 
 =head1 SEE ALSO
 
-L<Web::Hippie::Pipe>, L<Web::Hippie::Pipe>, L<AnyMQ>,
+L<Web::Hippie>, L<Web::Hippie::Pipe>, L<AnyMQ>,
 L<ZeroMQ::PubSub>
 
 =head1 AUTHOR
