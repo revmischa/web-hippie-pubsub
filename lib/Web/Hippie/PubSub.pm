@@ -78,18 +78,8 @@ sub prepare_app {
                     warn "Error subscribing to topic '$topic': $@";
                 }
 
-                # start keep-alive timer
-                if ($keep_alive) {
-                    my $w; $w = AnyEvent->timer( interval => $keep_alive,
-                                                 cb => sub {
-                                                     $h->send_msg({
-                                                         type => 'ping',
-                                                         time => AnyEvent->now,
-                                                     });
-                                                     $w;
-                                                 });
-                }
-
+                $self->start_keepalive_timer($env);
+                
                 # success
                 return $res || [ '200', [ 'Content-Type' => 'text/plain' ], [ "Now listening on $channel" ] ];
 
@@ -111,21 +101,8 @@ sub prepare_app {
 
                 my $res = $app->($env);
                 return $res || [ '200', [ 'Content-Type' => 'text/plain' ], [ "Event published on $channel" ] ];
-            } else {
-                # other message (should only be error)
-                # make sure stuff is kosher
-
-                my $res = $app->($env);
-                
-                my $h = $env->{'hippie.handle'}
-                    or return $res || [ '400', [ 'Content-Type' => 'text/plain' ], [ "missing handle" ] ];
-
-                if ($req->path eq '/error') {
-                    warn "==> disconnecting $h (error or timeout)\n";
-                } else {
-                    warn "unknown hippie message: " . $req->path;
-                    return $res || [ '500', [ 'Content-Type' => 'text/plain' ], [ 'Unknown error' ] ];
-                }
+            } elsif ($req->path eq '/error') {
+                $self->stop_keepalive_timer($env);
             }
 
             my $res = $app->($env);
@@ -136,6 +113,40 @@ sub prepare_app {
     });
 
     $self->app( $builder->to_app($self->app) );
+}
+
+sub start_keepalive_timer {
+    my ($self, $env) = @_;
+
+    return unless $self->keep_alive;
+
+    my $h = $env->{'hippie.handle'};
+    
+    my $w = AnyEvent->timer(
+        interval => $self->keep_alive,
+        cb => sub {
+            my $ok = eval {
+                $h->send_msg({
+                    type => 'ping',
+                    time => AnyEvent->now,
+                });
+                1;
+            };
+
+            # client has disconnected, stop firing
+            unless ($ok) {
+                $self->stop_keepalive_timer($env);
+            }
+        }
+    );
+    $env->{'hippie.listener'}->{keepalive_timer} = $w;
+}
+
+sub stop_keepalive_timer {
+    my ($self, $env) = @_;
+    
+    delete $env->{'hippie.listener'}->{keepalive_timer}
+        if $env->{'hippie.listener'};
 }
 
 1;
