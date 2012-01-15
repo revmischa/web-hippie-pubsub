@@ -58,7 +58,9 @@ builder {
 
     # anymq hippie server
     mount '/_hippie' => builder {
-        enable "+Web::Hippie::PubSub", bus => $mq_bus;
+        enable "+Web::Hippie::PubSub",
+            keep_alive => 5,
+            bus        => $mq_bus;
         sub {
             my ($env) = @_;
 
