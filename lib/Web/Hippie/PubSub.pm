@@ -2,7 +2,7 @@ package Web::Hippie::PubSub;
 
 use strict;
 use warnings;
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 use parent 'Plack::Middleware';
 
 use AnyEvent;
