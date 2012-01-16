@@ -18,7 +18,9 @@ SYNOPSIS
       builder {
         # mount hippie server
         mount '/_hippie' => builder {
-          enable "+Web::Hippie::PubSub", bus => $bus;
+          enable "+Web::Hippie::PubSub",
+            keep_alive => 30,   # send 'ping' event every 30 seconds
+            bus        => $bus;
           sub {
             my $env = shift;
             my $args = $env->{'hippie.args'};
@@ -28,6 +30,10 @@ SYNOPSIS
         };
         mount '/' => my $app;
       };
+
+ATTRIBUTES
+        Number of seconds between keep-alive events. ZMQ::Server will send a
+        "ping" event to keep connections alive. Set to zero to disable.
 
 DESCRIPTION
     This module adds publish/subscribe capabilities to Web::Hippie using
@@ -50,4 +56,14 @@ AUTHOR
 LICENSE
     This library is free software; you can redistribute it and/or modify it
     under the same terms as Perl itself.
+
+POD ERRORS
+    Hey! The above document had some coding errors, which are explained
+    below:
+
+    Around line 198:
+        Unknown directive: =title
+
+    Around line 204:
+        Unknown directive: =title
 
