@@ -195,13 +195,11 @@ Web::Hippie::PubSub - Comet/Long-poll event server using AnyMQ
 
 =over 4
 
-=head2 bus
-
-=cut
+=item bus
 
 AnyMQ bus configured for publish/subscribe events
 
-=head2 keep_alive
+=item keep_alive
 
 Number of seconds between keep-alive events. ZMQ::Server will send a
 "ping" event to keep connections alive. Set to zero to disable.
