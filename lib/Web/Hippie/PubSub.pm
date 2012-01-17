@@ -38,6 +38,32 @@ sub prepare_app {
 
     my $builder = Plack::Builder->new;
 
+    # stats server
+    $builder->add_middleware(sub {
+        my $app = shift;
+        return sub {
+            my $env = shift;
+            my $req = Plack::Request->new($env);
+            my $path = $req->path;
+
+            #warn "path: $path";
+            if ($path eq '/stats') {
+                my $res = $req->new_response(200);
+                $res->content_type('text/html; charset=utf-8');
+
+                my $ret = '';
+                while (my ($stat, $count) = each %{$self->stats}) {
+                    $ret .= "$stat: $count\n";
+                }
+
+                $res->content($ret);
+                $res->finalize;
+            } else {
+                return $app->($env);
+            }
+        }
+    });
+
     # websocket/mxhr/poll handlers
     $builder->add_middleware('+Web::Hippie');
     
@@ -79,6 +105,9 @@ sub prepare_app {
                 }
 
                 $self->start_keepalive_timer($env);
+
+                $self->increment_stats_counter('current_subscribers');
+                $self->increment_stats_counter('total_subscribers');
                 
                 # success
                 return $res || [ '200', [ 'Content-Type' => 'text/plain' ], [ "Now listening on $channel" ] ];
@@ -99,10 +128,13 @@ sub prepare_app {
                 # they will receive a duplicate event)
                 $topic->publish($msg);
 
+                $self->increment_stats_counter('events_published');
+
                 my $res = $app->($env);
                 return $res || [ '200', [ 'Content-Type' => 'text/plain' ], [ "Event published on $channel" ] ];
             } elsif ($req->path eq '/error') {
                 $self->stop_keepalive_timer($env);
+                $self->decrement_stats_counter('current_subscribers');
             }
 
             my $res = $app->($env);
@@ -147,6 +179,26 @@ sub stop_keepalive_timer {
     
     delete $env->{'hippie.listener'}->{keepalive_timer}
         if $env->{'hippie.listener'};
+}
+
+sub increment_stats_counter {
+    my ($self, $stat_name) = @_;
+
+    $self->{_stats}{$stat_name} ||= 0;
+    $self->{_stats}{$stat_name}++;
+}
+
+sub decrement_stats_counter {
+    my ($self, $stat_name) = @_;
+
+    $self->{_stats}{$stat_name} ||= 0;
+    $self->{_stats}{$stat_name}--;
+}
+
+sub stats {
+    my ($self) = @_;
+    
+    return $self->{_stats} || {};
 }
 
 1;
@@ -203,6 +255,16 @@ AnyMQ bus configured for publish/subscribe events
 
 Number of seconds between keep-alive events. ZMQ::Server will send a
 "ping" event to keep connections alive. Set to zero to disable.
+
+=back
+
+=head1 METHODS
+
+=over 4
+
+=item stats
+
+Returns hashref of statistical event handling information.
 
 =back
 

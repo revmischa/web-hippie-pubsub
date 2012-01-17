@@ -27,11 +27,6 @@ sub fatal {
     cluck "Fatal error when handling request: $err\n";
 }
 
-# stats
-our $total_subscribers = 0;
-our $current_subscribers = 0;
-our $events_published = 0;
-
 my $app = sub {
     my $env = shift;
     my $req = Plack::Request->new($env);
@@ -42,14 +37,6 @@ my $app = sub {
     if ($req->path eq '/') {
         # index
         $res->redirect('/static/events.html');
-    } elsif ($req->path eq '/stats') {
-        # print out statistical information
-        my $ret = qq/
-total_subscribers: $total_subscribers
-current_subscribers: $current_subscribers
-published_events: $events_published
-/;
-        $res->content($ret);
     } else {
         # unknown path
         $res->content("Unknown path " . $req->path);
@@ -83,15 +70,11 @@ builder {
 
             if ($path eq '/new_listener') {
                 warn "Got new listener on channel $channel\n";
-                $current_subscribers++;
-                $total_subscribers++;
             } elsif ($path eq '/message') {
                 my $msg = $env->{'hippie.message'};
-                $events_published++;
                 warn "Posting message to channel $channel\n";
             } elsif ($path eq '/error') {
                 # client disconnected
-                $current_subscribers--;
             } else {
                 warn "Unknown hippie event: $path\n";
             }
