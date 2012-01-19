@@ -176,6 +176,8 @@ sub start_keepalive_timer {
 
 sub stop_keepalive_timer {
     my ($self, $env) = @_;
+
+    undef $env->{'hippie.listener'}->{keepalive_timer};
     
     delete $env->{'hippie.listener'}->{keepalive_timer}
         if $env->{'hippie.listener'};
