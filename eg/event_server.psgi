@@ -74,7 +74,7 @@ builder {
                 my $msg = $env->{'hippie.message'};
                 warn "Posting message to channel $channel\n";
             } elsif ($path eq '/error') {
-                warn "Got hippie error\n";
+                # client disconnected
             } else {
                 warn "Unknown hippie event: $path\n";
             }

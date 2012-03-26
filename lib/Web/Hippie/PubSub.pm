@@ -2,7 +2,7 @@ package Web::Hippie::PubSub;
 
 use strict;
 use warnings;
-our $VERSION = '0.03';
+our $VERSION = '0.06';
 use parent 'Plack::Middleware';
 
 use AnyEvent;
@@ -37,6 +37,32 @@ sub prepare_app {
     my $keep_alive = $self->keep_alive;
 
     my $builder = Plack::Builder->new;
+
+    # stats server
+    $builder->add_middleware(sub {
+        my $app = shift;
+        return sub {
+            my $env = shift;
+            my $req = Plack::Request->new($env);
+            my $path = $req->path;
+
+            #warn "path: $path";
+            if ($path eq '/stats') {
+                my $res = $req->new_response(200);
+                $res->content_type('text/html; charset=utf-8');
+
+                my $ret = '';
+                while (my ($stat, $count) = each %{$self->stats}) {
+                    $ret .= "$stat: $count\n";
+                }
+
+                $res->content($ret);
+                $res->finalize;
+            } else {
+                return $app->($env);
+            }
+        }
+    });
 
     # websocket/mxhr/poll handlers
     $builder->add_middleware('+Web::Hippie');
@@ -78,18 +104,11 @@ sub prepare_app {
                     warn "Error subscribing to topic '$topic': $@";
                 }
 
-                # start keep-alive timer
-                if ($keep_alive) {
-                    my $w; $w = AnyEvent->timer( interval => $keep_alive,
-                                                 cb => sub {
-                                                     $h->send_msg({
-                                                         type => 'ping',
-                                                         time => AnyEvent->now,
-                                                     });
-                                                     $w;
-                                                 });
-                }
+                $self->start_keepalive_timer($env);
 
+                $self->increment_stats_counter('current_subscribers');
+                $self->increment_stats_counter('total_subscribers');
+                
                 # success
                 return $res || [ '200', [ 'Content-Type' => 'text/plain' ], [ "Now listening on $channel" ] ];
 
@@ -109,23 +128,13 @@ sub prepare_app {
                 # they will receive a duplicate event)
                 $topic->publish($msg);
 
+                $self->increment_stats_counter('events_published');
+
                 my $res = $app->($env);
                 return $res || [ '200', [ 'Content-Type' => 'text/plain' ], [ "Event published on $channel" ] ];
-            } else {
-                # other message (should only be error)
-                # make sure stuff is kosher
-
-                my $res = $app->($env);
-                
-                my $h = $env->{'hippie.handle'}
-                    or return $res || [ '400', [ 'Content-Type' => 'text/plain' ], [ "missing handle" ] ];
-
-                if ($req->path eq '/error') {
-                    warn "==> disconnecting $h (error or timeout)\n";
-                } else {
-                    warn "unknown hippie message: " . $req->path;
-                    return $res || [ '500', [ 'Content-Type' => 'text/plain' ], [ 'Unknown error' ] ];
-                }
+            } elsif ($req->path eq '/error') {
+                $self->stop_keepalive_timer($env);
+                $self->decrement_stats_counter('current_subscribers');
             }
 
             my $res = $app->($env);
@@ -136,6 +145,62 @@ sub prepare_app {
     });
 
     $self->app( $builder->to_app($self->app) );
+}
+
+sub start_keepalive_timer {
+    my ($self, $env) = @_;
+
+    return unless $self->keep_alive;
+
+    my $h = $env->{'hippie.handle'};
+    
+    my $w = AnyEvent->timer(
+        interval => $self->keep_alive,
+        cb => sub {
+            my $ok = eval {
+                $h->send_msg({
+                    type => 'ping',
+                    time => AnyEvent->now,
+                });
+                1;
+            };
+
+            # client has disconnected, stop firing
+            unless ($ok) {
+                $self->stop_keepalive_timer($env);
+            }
+        }
+    );
+    $env->{'hippie.listener'}->{keepalive_timer} = $w;
+}
+
+sub stop_keepalive_timer {
+    my ($self, $env) = @_;
+
+    undef $env->{'hippie.listener'}->{keepalive_timer};
+    
+    delete $env->{'hippie.listener'}->{keepalive_timer}
+        if $env->{'hippie.listener'};
+}
+
+sub increment_stats_counter {
+    my ($self, $stat_name) = @_;
+
+    $self->{_stats}{$stat_name} ||= 0;
+    $self->{_stats}{$stat_name}++;
+}
+
+sub decrement_stats_counter {
+    my ($self, $stat_name) = @_;
+
+    $self->{_stats}{$stat_name} ||= 0;
+    $self->{_stats}{$stat_name}--;
+}
+
+sub stats {
+    my ($self) = @_;
+    
+    return $self->{_stats} || {};
 }
 
 1;
@@ -184,16 +249,24 @@ Web::Hippie::PubSub - Comet/Long-poll event server using AnyMQ
 
 =over 4
 
-=title bus
-
-=cut
+=item bus
 
 AnyMQ bus configured for publish/subscribe events
 
-=title keep_alive
+=item keep_alive
 
 Number of seconds between keep-alive events. ZMQ::Server will send a
 "ping" event to keep connections alive. Set to zero to disable.
+
+=back
+
+=head1 METHODS
+
+=over 4
+
+=item stats
+
+Returns hashref of statistical event handling information.
 
 =back
 
