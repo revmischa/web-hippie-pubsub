@@ -52,12 +52,13 @@ sub prepare_app {
                 $res->content_type('text/html; charset=utf-8');
 
                 my $ret = '';
-                while (my ($stat, $count) = each %{$self->stats}) {
+                foreach my $stat (keys %{ $self->stats }) {
+                    my $count = $self->stats->{$stat};
                     $ret .= "$stat: $count\n";
                 }
 
                 $res->content($ret);
-                $res->finalize;
+                return $res->finalize;
             } else {
                 return $app->($env);
             }
@@ -202,7 +203,10 @@ sub decrement_stats_counter {
 
 sub stats {
     my ($self) = @_;
-    
+
+    # gotta output something
+    $self->{_stats}{current_subscribers} ||= 0;
+
     return $self->{_stats} || {};
 }
 
