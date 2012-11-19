@@ -19,7 +19,7 @@ use Carp qw/croak cluck/;
 # bus = AnyMQ pubsub client bus
 # keep_alive = seconds between "ping" events
 use Plack::Util::Accessor qw/
-    bus keep_alive
+    bus keep_alive allow_clientless_publish
 /;
 
 sub call {
@@ -68,7 +68,10 @@ sub prepare_app {
     $builder->add_middleware('+Web::Hippie');
     
     # AnyMQ stuff for Web::Hippie
-    $builder->add_middleware('+Web::Hippie::Pipe', bus => $self->bus);
+    $builder->add_middleware('+Web::Hippie::Pipe',
+        bus => $self->bus,
+        allow_clientless_publish => $self->allow_clientless_publish,
+    );
     
     # our simple publish/subscribe event code
     $builder->add_middleware(sub {
